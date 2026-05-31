@@ -1,7 +1,7 @@
 import pygame
-
 from game.snake import SnakeGame
 from agents.qlearning import QLearningAgent
+from agents.dyna_q import DynaQAgent
 
 pygame.init()
 
@@ -11,17 +11,23 @@ WIDTH, HEIGHT = 600, 400
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 
-font = pygame.font.SysFont("Arial", 24)
+font = pygame.font.SysFont("Arial", 20)
 
 game = SnakeGame()
 
-# =========================
-# LOAD TRAINED AI
-# =========================
-agent = QLearningAgent()
-agent.load("models/qlearning.pkl")
+# ================= AGENTS =================
+q_agent = QLearningAgent()
+d_agent = DynaQAgent()
+
+q_agent.load("models/qlearning.pkl")
+d_agent.load("models/dyna_q.pkl")
 
 running = True
+
+
+def reset_game():
+    global game
+    game = SnakeGame()
 
 
 while running:
@@ -32,84 +38,71 @@ while running:
 
     keys = pygame.key.get_pressed()
 
-    # =========================
-    # GLOBAL CONTROLS
-    # =========================
+    # ================= GLOBAL CONTROLS =================
     if keys[pygame.K_q]:
         running = False
 
     if keys[pygame.K_r]:
-        game.reset()
+        reset_game()
 
-    # =========================
-    # HUMAN CONTROL
-    # =========================
+    # ================= HUMAN =================
     if game.human_alive:
         if keys[pygame.K_UP]:
-            game.change_human_dir((0, -CELL))
+            game.human_dir = (0, -CELL)
         elif keys[pygame.K_DOWN]:
-            game.change_human_dir((0, CELL))
+            game.human_dir = (0, CELL)
         elif keys[pygame.K_LEFT]:
-            game.change_human_dir((-CELL, 0))
+            game.human_dir = (-CELL, 0)
         elif keys[pygame.K_RIGHT]:
-            game.change_human_dir((CELL, 0))
+            game.human_dir = (CELL, 0)
 
-    # =========================
-    # AI CONTROL (TRAINED MODEL)
-    # =========================
-    if game.ai_alive:
+    # ================= Q AI =================
+    if game.q_alive:
+        state = game.get_state_q()
+        action = q_agent.choose_action(state)
+        game.q_dir = game.get_new_direction(game.q_dir, action)
 
-        state = game.get_ai_state()
-        action = agent.choose_action(state)
+    # ================= DYNA AI =================
+    if game.dyna_alive:
+        state = game.get_state_dyna()
+        action = d_agent.choose_action(state)
+        game.dyna_dir = game.get_new_direction(game.dyna_dir, action)
 
-        game.ai_dir = game.get_new_direction(game.ai_dir, action)
+    # ================= MOVE =================
+    if game.human_alive:
+        game.move_snake(game.human, game.human_dir, "human")
 
-        # optional: store last move (for future learning / debugging)
-        game.ai_last_state = state
-        game.ai_last_action = action
+    if game.q_alive:
+        game.move_snake(game.q_ai, game.q_dir, "q")
 
-    # =========================
-    # MOVE GAME
-    # =========================
-    game.move()
+    if game.dyna_alive:
+        game.move_snake(game.dyna_ai, game.dyna_dir, "dyna")
 
-    # =========================
-    # DRAWING
-    # =========================
+    # ================= AUTO RESET =================
+    if not game.human_alive and not game.q_alive and not game.dyna_alive:
+        reset_game()
+
+    # ================= DRAW =================
     screen.fill((0, 0, 0))
 
-    # food
     pygame.draw.rect(screen, (255, 0, 0), (*game.food, CELL, CELL))
 
-    # human snake
-    for i, s in enumerate(game.human):
-        color = (0, 255, 0) if game.human_alive else (80, 80, 80)
-        pygame.draw.rect(screen, color, (*s, CELL, CELL))
+    for s in game.human:
+        pygame.draw.rect(screen, (0, 255, 0), (*s, CELL, CELL))
 
-    # AI snake
-    for i, s in enumerate(game.ai):
-        color = (0, 0, 255) if game.ai_alive else (80, 80, 80)
-        pygame.draw.rect(screen, color, (*s, CELL, CELL))
+    for s in game.q_ai:
+        pygame.draw.rect(screen, (0, 0, 255), (*s, CELL, CELL))
 
-    # =========================
-    # SCORE
-    # =========================
-    text = font.render(
-        f"Human: {game.human_score} | AI: {game.ai_score}",
+    for s in game.dyna_ai:
+        pygame.draw.rect(screen, (200, 0, 255), (*s, CELL, CELL))
+
+    # ================= HUD =================
+    hud = font.render(
+        f"Human: {game.human_score} | Q: {game.q_score} | Dyna: {game.dyna_score}",
         True,
         (255, 255, 255)
     )
-    screen.blit(text, (10, 10))
-
-    # =========================
-    # STATUS
-    # =========================
-    status = font.render(
-        f"Human: {'Alive' if game.human_alive else 'Dead'} | AI: {'AI (Q-Learning)'}",
-        True,
-        (200, 200, 200)
-    )
-    screen.blit(status, (10, 35))
+    screen.blit(hud, (10, 10))
 
     pygame.display.flip()
     clock.tick(10)
