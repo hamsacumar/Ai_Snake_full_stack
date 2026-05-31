@@ -12,6 +12,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 
 font = pygame.font.SysFont("Arial", 20)
+big_font = pygame.font.SysFont("Arial", 28)
 
 game = SnakeGame()
 
@@ -30,22 +31,35 @@ def reset_game():
     game = SnakeGame()
 
 
+# ================= BUTTON =================
+def button(text, x, y, w, h, color):
+    mouse = pygame.mouse.get_pos()
+    click = pygame.mouse.get_pressed()
+
+    rect = pygame.Rect(x, y, w, h)
+
+    hovered = rect.collidepoint(mouse)
+
+    pygame.draw.rect(screen, (80, 80, 80) if hovered else color, rect)
+
+    label = font.render(text, True, (255, 255, 255))
+    screen.blit(label, (x + 15, y + 8))
+
+    if hovered and click[0]:
+        return True
+
+    return False
+
+
 while running:
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
+    # ================= HUMAN =================
     keys = pygame.key.get_pressed()
 
-    # ================= GLOBAL CONTROLS =================
-    if keys[pygame.K_q]:
-        running = False
-
-    if keys[pygame.K_r]:
-        reset_game()
-
-    # ================= HUMAN =================
     if game.human_alive:
         if keys[pygame.K_UP]:
             game.human_dir = (0, -CELL)
@@ -69,14 +83,7 @@ while running:
         game.dyna_dir = game.get_new_direction(game.dyna_dir, action)
 
     # ================= MOVE =================
-    if game.human_alive:
-        game.move_snake(game.human, game.human_dir, "human")
-
-    if game.q_alive:
-        game.move_snake(game.q_ai, game.q_dir, "q")
-
-    if game.dyna_alive:
-        game.move_snake(game.dyna_ai, game.dyna_dir, "dyna")
+    game.step_all()
 
     # ================= AUTO RESET =================
     if not game.human_alive and not game.q_alive and not game.dyna_alive:
@@ -96,13 +103,30 @@ while running:
     for s in game.dyna_ai:
         pygame.draw.rect(screen, (200, 0, 255), (*s, CELL, CELL))
 
-    # ================= HUD =================
-    hud = font.render(
+    # ================= SCORE =================
+    score = font.render(
         f"Human: {game.human_score} | Q: {game.q_score} | Dyna: {game.dyna_score}",
         True,
         (255, 255, 255)
     )
-    screen.blit(hud, (10, 10))
+    screen.blit(score, (10, 10))
+
+    # ================= STATUS =================
+    status = big_font.render(
+        f"H:{'ALIVE' if game.human_alive else 'DEAD'}  "
+        f"Q:{'ALIVE' if game.q_alive else 'DEAD'}  "
+        f"D:{'ALIVE' if game.dyna_alive else 'DEAD'}",
+        True,
+        (255, 255, 0)
+    )
+    screen.blit(status, (10, 40))
+
+    # ================= UI BUTTONS =================
+    if button("RESET", 470, 10, 110, 35, (0, 150, 0)):
+        reset_game()
+
+    if button("QUIT", 470, 55, 110, 35, (150, 0, 0)):
+        running = False
 
     pygame.display.flip()
     clock.tick(10)

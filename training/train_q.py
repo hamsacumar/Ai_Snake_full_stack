@@ -1,27 +1,30 @@
-import time
 import numpy as np
 
 from game.snake import SnakeGame
 from agents.qlearning import QLearningAgent
 
 
-def get_reward(game):
-    # death penalty
-    if not game.ai_alive:
-        return -10
+def get_reward(game, prev_head, new_head):
+    food = game.food
 
-    # food reward
-    if game.ai[0] == game.food:
-        return 10
+    # death
+    if not game.q_alive:
+        return -20
 
-    return -0.1
+    # food eaten
+    if new_head == food:
+        return 20
+
+    # distance shaping
+    old_dist = abs(prev_head[0] - food[0]) + abs(prev_head[1] - food[1])
+    new_dist = abs(new_head[0] - food[0]) + abs(new_head[1] - food[1])
+
+    return (old_dist - new_dist) * 0.2 - 0.05
 
 
 def train():
     agent = QLearningAgent()
-
-    # load previous training if exists
-    agent.load()
+    agent.load("models/qlearning.pkl")
 
     episodes = 5000
 
@@ -30,48 +33,41 @@ def train():
         game = SnakeGame()
         game.reset()
 
-        state = game.get_ai_state()
-        total_reward = 0
+        state = game.get_state_q()
 
+        total_reward = 0
         step = 0
 
-        while game.ai_alive and step < 1000:
+        while game.q_alive and step < 1000:
 
-            # choose action
+            prev_head = game.q_ai[0]
+
             action = agent.choose_action(state)
 
-            # apply action → update direction
-            game.ai_dir = game.get_new_direction(game.ai_dir, action)
+            game.q_dir = game.get_new_direction(game.q_dir, action)
 
-            # store old state/action
             old_state = state
-            old_action = action
 
-            # move game (AI + human ignored)
             game.move()
 
-            # new state
-            state = game.get_ai_state()
+            new_head = game.q_ai[0]
 
-            # reward
-            reward = get_reward(game)
+            state = game.get_state_q()
+
+            reward = get_reward(game, prev_head, new_head)
+
+            agent.update(old_state, action, reward, state)
+
             total_reward += reward
-
-            # Q-learning update
-            agent.update(old_state, old_action, reward, state)
-
             step += 1
 
-        # decay exploration slowly
         agent.decay_epsilon()
 
-        # save model every 100 episodes
         if episode % 100 == 0:
-            agent.save()
-            print(f"Episode {episode} | Score: {game.ai_score} | Reward: {total_reward:.2f}")
+            agent.save("models/qlearning.pkl")
+            print(f"Episode {episode} | Score: {game.q_score} | Reward: {total_reward:.2f}")
 
-    # final save
-    agent.save()
+    agent.save("models/qlearning.pkl")
     print("Training completed!")
 
 
