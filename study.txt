@@ -1,0 +1,32 @@
+We will NOT train during gameplay yet.
+
+We will do:
+
+Phase 2A:
+
+👉 Build RL structure (state + reward + actions)
+
+Phase 2B:
+
+👉 Train AI separately
+
+Phase 2C:
+
+👉 Load trained AI into game
+
+
+
+qlearning.py
+     ↓
+train_q.py  → creates →  qlearning.pkl
+     ↓
+play.py     → loads →    qlearning.pkl
+
+
+✔ In train_q.py → learns
+✔ In play.py → plays using trained model
+✔ qlearning.pkl → stores learned knowledge
+
+
+train_q.py → learns policy → saves model
+play.py → loads model → AI plays smart
